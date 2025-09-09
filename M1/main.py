@@ -4,12 +4,12 @@ from scipy.integrate import solve_ivp
 
 def diff_system(t, data, params):
     x, y, v_x, v_y = data
-    mass, koef, g = params
-    
+    mass, koef, g, koef_type = params
+
     dxdt = v_x
     dydt = v_y
-    dv_xdt = -koef / mass * v_x
-    dv_ydt = -g - koef / mass * v_y
+    dv_xdt = -koef / mass * v_x if koef_type != "friction" else -koef / mass * v_x * v_x
+    dv_ydt = -g - koef / mass * v_y if koef_type != "friction" else -g - koef / mass * v_y * v_y
 
     return [dxdt, dydt, dv_xdt, dv_ydt]
 
@@ -26,15 +26,15 @@ def vizualization(dots):
     y_values = list(dots[1])[:-1]
     y_values.append(0)
     times = dots[2]
-    print(x_values[-1], y_values[-1], times[-1])
     plt.figure(figsize=(8, 6))
     plt.plot(x_values, y_values, 'g-', linewidth=2, alpha=0.7)
-    plt.scatter(x_values, y_values, c=times, cmap='viridis', s=100, alpha=0.8)
 
-    plt.colorbar(label='Время')
+    # Если хочется видеть зависимость координаты от времени 
+    # plt.scatter(x_values, y_values, c=times, cmap='viridis', s=100, alpha=0.8)
+    # plt.colorbar(label='Время')
+
     plt.xlabel('X координата')
     plt.ylabel('Y координата')
-    plt.title('Траектория движения (X-Y)')
     plt.grid(True, alpha=0.3)
     plt.axis('equal')
     plt.show()
@@ -47,11 +47,13 @@ def solver():
         start_velocity = 100.0
         angle = 45.0
         resistance_koefficient = 0.1
+        resistance_type = "frontal"
     else:
         start_velocity = float(input("Start velocity: "))
         angle = float(input("Angle: "))
         resistance_koefficient = float(input("Resistance koefficient: "))
-    params = [mass, resistance_koefficient, g]
+        resistance_type = "frontal" if int(input("Choose resistance type: \n1. Frontal resistance\n2. Viscous friction\nWrite a number: ")) == 1 else "friction"
+    params = [mass, resistance_koefficient, g, resistance_type]
 
     t_span = [0, 100]
     rad_angle = np.radians(angle)
