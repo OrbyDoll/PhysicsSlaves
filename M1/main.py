@@ -4,12 +4,12 @@ from scipy.integrate import solve_ivp
 
 def diff_system(t, data, params):
     x, y, v_x, v_y = data
-    mass, koef, g, koef_type = params
+    mass, frontal_koef, friction_koef, g = params
 
     dxdt = v_x
     dydt = v_y
-    dv_xdt = -koef / mass * v_x if koef_type != "friction" else -koef / mass * v_x * v_x
-    dv_ydt = -g - koef / mass * v_y if koef_type != "friction" else -g - koef / mass * v_y * v_y
+    dv_xdt = -frontal_koef / mass * v_x - friction_koef / mass * v_x * v_x
+    dv_ydt = -g - frontal_koef / mass * v_y - friction_koef / mass * v_y * v_y
 
     return [dxdt, dydt, dv_xdt, dv_ydt]
 
@@ -42,18 +42,19 @@ def vizualization(dots):
 def solver():
     mass = 1
     g = 9.8
-    use_default = bool(input("Do you want to use default settings? Please print Y or N: ") == "Y")
+    use_default = bool(input("Do you want to use default settings? Please print Y or N: ").lower() == "y")
     if use_default:
         start_velocity = 100.0
         angle = 45.0
-        resistance_koefficient = 0.1
+        frontal_koefficient = 0.1
+        friction_koefficient = 0
         resistance_type = "frontal"
     else:
         start_velocity = float(input("Start velocity: "))
         angle = float(input("Angle: "))
-        resistance_koefficient = float(input("Resistance koefficient: "))
-        resistance_type = "frontal" if int(input("Choose resistance type: \n1. Frontal resistance\n2. Viscous friction\nWrite a number: ")) == 1 else "friction"
-    params = [mass, resistance_koefficient, g, resistance_type]
+        frontal_koefficient = float(input("Frontal koefficient: "))
+        friction_koefficient = float(input("Friction koefficient: "))
+    params = [mass, frontal_koefficient, friction_koefficient, g]
 
     t_span = [0, 100]
     rad_angle = np.radians(angle)
