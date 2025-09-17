@@ -26,6 +26,9 @@ class Vector:
     def __add__(self, other):
         return Vector(self.x + other.x, self.y + other.y)
     
+    def __sub__(self, other):
+        return Vector(self.x - other.x, self.y - other.y)
+    
     def __mul__(self, scalar: float):
         return Vector(self.x * scalar, self.y * scalar)
     
@@ -46,9 +49,10 @@ class Ball:
     def update(self, dt: float):
         self.position += self.velocity * dt
         if self.velocity.module() > 0:
-            if self.check_collision():
-                print("Collision")
+            if self.check_wall_collision():
+                print("Wall Collision")
                 self.velocity = Vector(0,0)
+            
 
     def draw(self, table):
         pg.draw.circle(table, self.color, self.position.dot(), self.radius)
@@ -58,13 +62,17 @@ class Ball:
             return True
         return False
     
-    def check_collision(self):
+    def check_wall_collision(self):
         return (
             self.position.x - self.radius <= MARGIN_LEFT or
             self.position.x + self.radius >= SCREEN_WIDTH - MARGIN_LEFT or
             self.position.y + self.radius >= SCREEN_HEIGHT - MARGIN_TOP or
             self.position.y - self.radius <= MARGIN_TOP
         )
+    
+    def check_balls_collision(self, other: 'Ball'):
+        return (self.position - other.position).module() < (self.radius + other.radius)
+
 
 class Game:
     def __init__(self):
@@ -107,12 +115,10 @@ class Game:
                 if event.button == 1:
                     cursor_pos = pg.mouse.get_pos()
                     if self.mode == "game":
-                        print("Play")
                         current_ball: Ball = self.get_ball_by_coord(Vector(cursor_pos[0], cursor_pos[1]))
                         if current_ball != None:
                             current_ball.velocity = Vector(-5, 0)
                     else:
-                        print("Create")
                         ball = Ball(Vector(cursor_pos[0], cursor_pos[1]))
                         self.balls.append(ball)
 

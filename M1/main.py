@@ -8,8 +8,8 @@ def diff_system(t, data, params):
 
     dxdt = v_x
     dydt = v_y
-    dv_xdt = -frontal_koef / mass * v_x - friction_koef / mass * v_x * v_x
-    dv_ydt = -g - frontal_koef / mass * v_y - friction_koef / mass * v_y * v_y
+    dv_xdt = -friction_koef / mass * v_x - frontal_koef / mass * v_x * v_x
+    dv_ydt = -g - friction_koef / mass * v_y - frontal_koef / mass * v_y * v_y
 
     return [dxdt, dydt, dv_xdt, dv_ydt]
 
@@ -48,7 +48,6 @@ def solver():
         angle = 45.0
         frontal_koefficient = 0.1
         friction_koefficient = 0
-        resistance_type = "frontal"
     else:
         start_velocity = float(input("Start velocity: "))
         angle = float(input("Angle: "))
