@@ -2,10 +2,13 @@ import pygame as pg
 from typing import List
 import math
 
-SCREEN_WIDTH = 1200
-SCREEN_HEIGHT = 800
-TABLE_WIDTH = 1000
-TABLE_HEIGHT = 600
+SCREEN_WIDTH = 1000
+SCREEN_HEIGHT = 600
+TABLE_COEF = 0.7
+TABLE_WIDTH = SCREEN_WIDTH * TABLE_COEF 
+TABLE_HEIGHT = SCREEN_HEIGHT * TABLE_COEF
+CUE_LENGTH = 200
+CUE_WIDTH = 5
 MARGIN_TOP = (SCREEN_HEIGHT - TABLE_HEIGHT) / 2
 MARGIN_LEFT = (SCREEN_WIDTH - TABLE_WIDTH) / 2
 BORDER_RADIUS = 30
@@ -16,6 +19,7 @@ BORDER_MARGIN_TOP = MARGIN_TOP - BORDER / 2
 BORDER_MARGIN_LEFT = MARGIN_LEFT - BORDER / 2
 BORDER_BORDER_RADIUS = int(BORDER_RADIUS + BORDER / 2)
 BALL_SIZE = 15
+CUE_DEFAULT_POS = (SCREEN_WIDTH - (SCREEN_WIDTH - BORDER_WIDTH) / 4 - CUE_WIDTH / 2, (SCREEN_HEIGHT - BORDER_HEIGHT) / 4 + CUE_LENGTH / 2)
 COLORS = {"GREEN" : (0, 100, 0), "BROWN": (101,67,33)}
 
 class Vector:
@@ -40,7 +44,8 @@ class Vector:
 
 
 class Ball:
-    def __init__(self, position: Vector):
+    def __init__(self, table, position: Vector):
+        self.table = table
         self.position = position
         self.velocity = Vector(0, 0)
         self.radius = BALL_SIZE
@@ -54,8 +59,8 @@ class Ball:
                 self.velocity = Vector(0,0)
             
 
-    def draw(self, table):
-        pg.draw.circle(table, self.color, self.position.dot(), self.radius)
+    def draw(self):
+        pg.draw.circle(self.table, self.color, self.position.dot(), self.radius)
 
     def check_dot(self, dot: Vector):
         if (dot.x - self.position.x) ** 2 + (dot.y - self.position.y) ** 2 < self.radius ** 2:
@@ -73,14 +78,23 @@ class Ball:
     def check_balls_collision(self, other: 'Ball'):
         return (self.position - other.position).module() < (self.radius + other.radius)
 
+class Cue:
+    def __init__(self, table):
+        self.table = table
+
+    def draw(self, position):
+        pg.draw.circle(self.table, "RED", position, 10)
 
 class Game:
     def __init__(self):
         self.screen = pg.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.table = pg.draw.rect(self.screen, COLORS["GREEN"], (MARGIN_LEFT, MARGIN_TOP, TABLE_WIDTH, TABLE_HEIGHT), border_radius=BORDER_RADIUS)
+        self.cue = Cue(self.screen)
+        self.cue.draw(CUE_DEFAULT_POS)
         pg.draw.rect(self.screen, COLORS["BROWN"], (BORDER_MARGIN_LEFT, BORDER_MARGIN_TOP, BORDER_WIDTH, BORDER_HEIGHT), border_radius=BORDER_BORDER_RADIUS)
         self.balls: List[Ball] = []
         self.dt = pg.time.Clock().tick(60) / 1000.0
+        self.cue_pos = Vector(0, 0)
         self.running = True
         self.mode = "game"
 
@@ -95,7 +109,7 @@ class Game:
     def draw(self):
         self.table = pg.draw.rect(self.screen, COLORS["GREEN"], (MARGIN_LEFT, MARGIN_TOP, TABLE_WIDTH, TABLE_HEIGHT), border_radius=BORDER_RADIUS)
         for ball in self.balls:
-            ball.draw(self.screen)
+            ball.draw()
         pg.display.flip()
 
     def update(self):
@@ -119,7 +133,7 @@ class Game:
                         if current_ball != None:
                             current_ball.velocity = Vector(-5, 0)
                     else:
-                        ball = Ball(Vector(cursor_pos[0], cursor_pos[1]))
+                        ball = Ball(self.screen, Vector(cursor_pos[0], cursor_pos[1]))
                         self.balls.append(ball)
 
     def get_ball_by_coord(self, position: Vector):
