@@ -8,8 +8,8 @@ def diff_system(t, data, params):
 
     dxdt = v_x
     dydt = v_y
-    dv_xdt = -friction_koef / mass * v_x - frontal_koef / mass * v_x * v_x
-    dv_ydt = -g - friction_koef / mass * v_y - frontal_koef / mass * v_y * v_y
+    dv_xdt = -friction_koef / mass * v_x - frontal_koef / mass * v_x * np.sqrt(v_x ** 2 + v_y ** 2)
+    dv_ydt = -g - friction_koef / mass * v_y - frontal_koef / mass * v_y * np.sqrt(v_x ** 2 + v_y ** 2)
 
     return [dxdt, dydt, dv_xdt, dv_ydt]
 
@@ -39,7 +39,41 @@ def vizualization(dots):
     plt.axis('equal')
     plt.show()
 
-def solver():
+def solver(data):
+    mass, angle, start_velocity, g, frontal, friction = data
+    t_span = [0, 100]
+    rad_angle = np.radians(angle)
+    initial_conditions = [0, 0, start_velocity * np.cos(rad_angle), start_velocity * np.sin(rad_angle)]
+    t_eval = np.linspace(0, 100, 10000)
+    params = [mass, frontal, friction, g]
+
+    return solve_ivp(diff_system, t_span=t_span, args=(params, ), method='DOP853', events=hit_ground, y0=initial_conditions, t_eval=t_eval, rtol=1e-6, atol=1e-8, max_step=0.01, dense_output=True)
+
+def find_angle(data):
+    angle = 45
+    angle_diff = angle / 2
+    max_distance = 0
+    epsilon = 1e-3
+
+    while(angle_diff > epsilon):
+        left_angle = angle - angle_diff
+        right_angle = angle + angle_diff
+        left_solution = solver([data[0]] + [left_angle] + data[1:])
+        right_solution = solver([data[0]] + [right_angle] + data[1:])
+        if (left_solution.y[0][-1] > right_solution.y[0][-1]):
+            angle = left_angle
+            max_distance = left_solution.y[0][-1]
+            print(f'angle: {left_angle} - distance: {left_solution.y[0][-1]}')
+        else:
+            angle = right_angle
+            max_distance = right_solution.y[0][-1]
+            print(f'angle: {right_angle} - distance: {right_solution.y[0][-1]}')
+        angle_diff /= 2
+
+    return [angle, max_distance]
+
+
+def main():
     mass = 1
     g = 9.8
     use_default = bool(input("Do you want to use default settings? Please print Y or N: ").lower() == "y")
@@ -53,22 +87,20 @@ def solver():
         angle = float(input("Angle: "))
         frontal_koefficient = float(input("Frontal koefficient: "))
         friction_koefficient = float(input("Friction koefficient: "))
-    params = [mass, frontal_koefficient, friction_koefficient, g]
+    data = [mass, angle, start_velocity, g, frontal_koefficient, friction_koefficient]
+    solution = solver(data)
 
-    t_span = [0, 100]
-    rad_angle = np.radians(angle)
-    initial_conditions = [0, 0, start_velocity * np.cos(rad_angle), start_velocity * np.sin(rad_angle)]
-    t_eval = np.linspace(0, 100, 10000)
-
-    solution = solve_ivp(diff_system, t_span=t_span, args=(params, ), method='DOP853', events=hit_ground, y0=initial_conditions, t_eval=t_eval, rtol=1e-6, atol=1e-8, max_step=0.01, dense_output=True)
     print("Time: " + str(solution.t[-1]))
     print("Length: " + str(solution.y[0][-1]))
     print("Height: " + str(max(solution.y[1])))
 
+    optimal_data = find_angle([data[0]] + data[2:])
+    print(f"Max distance: {optimal_data[1]}, then angle is {optimal_data[0]}")
+
     vizualization([solution.y[0], list(solution.y[1]), solution.t])
 
 if __name__ == "__main__":
-    solver()
+    main()
 
 
 
