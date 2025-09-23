@@ -63,11 +63,9 @@ def find_angle(data):
         if (left_solution.y[0][-1] > right_solution.y[0][-1]):
             angle = left_angle
             max_distance = left_solution.y[0][-1]
-            print(f'angle: {left_angle} - distance: {left_solution.y[0][-1]}')
         else:
             angle = right_angle
             max_distance = right_solution.y[0][-1]
-            print(f'angle: {right_angle} - distance: {right_solution.y[0][-1]}')
         angle_diff /= 2
 
     return [angle, max_distance]
