@@ -22,6 +22,7 @@ BORDER_BORDER_RADIUS = int(BORDER_RADIUS + BORDER / 2)
 BALL_SIZE = 15
 CUE_DEFAULT_POS = (SCREEN_WIDTH - (SCREEN_WIDTH - BORDER_WIDTH) / 4 - CUE_WIDTH / 2, SCREEN_HEIGHT / 2 - CUE_LENGTH / 2)
 CUE_POLYGON = (*CUE_DEFAULT_POS, CUE_DEFAULT_POS[0], CUE_DEFAULT_POS[1] + CUE_LENGTH)
+EPS = 1e-1
 COLORS = {"GREEN" : (0, 100, 0), "BROWN": (101,67,33), "CUE": (100, 84, 82)}
 
 class Vector:
@@ -63,10 +64,21 @@ class Ball:
 
     def update(self, dt: float):
         self.position += self.velocity * dt
-        if self.velocity.module() > 0:
-            if self.check_wall_collision():
-                print("Wall Collision")
-                self.velocity = Vector(0,0)
+        if (pg.time.get_ticks() % 20 == 0):
+            self.velocity *= 0.99
+        if self.velocity.module() > EPS:
+            colision_value = self.check_wall_collision()
+            if colision_value:
+                if colision_value == 1:
+                    self.velocity = Vector(-self.velocity.x, self.velocity.y)
+                elif colision_value == 2:
+                    self.velocity = Vector(self.velocity.x, -self.velocity.y)
+                elif colision_value == 3:
+                    self.velocity = Vector(-self.velocity.x, self.velocity.y)
+                elif colision_value == 4:
+                    self.velocity = Vector(self.velocity.x, -self.velocity.y)
+        else:
+            self.velocity = Vector(0, 0)
             
 
     def draw(self):
@@ -78,12 +90,16 @@ class Ball:
         return False
     
     def check_wall_collision(self):
-        return (
-            self.position.x - self.radius <= MARGIN_LEFT or
-            self.position.x + self.radius >= SCREEN_WIDTH - MARGIN_LEFT or
-            self.position.y + self.radius >= SCREEN_HEIGHT - MARGIN_TOP or
-            self.position.y - self.radius <= MARGIN_TOP
-        )
+        if self.position.x - self.radius <= MARGIN_LEFT:
+            return 1 # Удар в левый бортик
+        elif self.position.x + self.radius >= SCREEN_WIDTH - MARGIN_LEFT:
+            return 3 # Удар в правый бортик
+        elif self.position.y + self.radius >= SCREEN_HEIGHT - MARGIN_TOP:
+            return 2 # Удар в нижний бортик
+        elif self.position.y - self.radius <= MARGIN_TOP:
+            return 4 # Удар в верхний бортик
+        else:
+            return 0
     
     def check_balls_collision(self, other: 'Ball'):
         return (self.position - other.position).module() < (self.radius + other.radius)
