@@ -261,14 +261,16 @@ class Game:
                         self.hit_power = ""
             elif event.type == pg.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    cursor_pos = pg.mouse.get_pos()
+                    cursor_tuple = pg.mouse.get_pos()
+                    cursor_pos = Vector(cursor_tuple[0], cursor_tuple[1])
                     if self.mode == "game":
-                        current_ball: Ball = self.get_ball_by_coord(Vector(cursor_pos[0], cursor_pos[1]))
+                        current_ball: Ball = self.get_ball_by_coord(cursor_pos)
                         if current_ball != None:
                             self.cue.aim_cue(current_ball)
                             self.mode = "aimed"
                     elif self.mode == "create":
-                        ball = Ball(self.screen, Vector(cursor_pos[0], cursor_pos[1]), len(self.balls) + 1)
+                        if self.validate_pos(cursor_pos): return
+                        ball = Ball(self.screen, cursor_pos, len(self.balls) + 1)
                         self.balls.append(ball)                
 
     def get_ball_by_coord(self, position: Vector):
@@ -276,6 +278,13 @@ class Game:
             if ball.check_dot(position):
                 return ball
         return None
+    
+    def validate_pos(self, pos: Vector):
+        return (pos.x - BALL_SIZE <= MARGIN_LEFT or 
+                pos.x + BALL_SIZE >= SCREEN_WIDTH - MARGIN_LEFT or 
+                pos.y + BALL_SIZE >= SCREEN_HEIGHT - MARGIN_TOP or 
+                pos.y - BALL_SIZE <= MARGIN_TOP)
+
     
 if __name__ == "__main__":
     game = Game()
