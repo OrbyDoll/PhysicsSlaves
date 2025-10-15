@@ -2,6 +2,7 @@ import pygame as pg
 import numpy as np
 from typing import List
 import math
+from enum import Enum
 
 SCREEN_WIDTH = 1000
 SCREEN_HEIGHT = 600
@@ -25,19 +26,32 @@ CUE_POLYGON = (*CUE_DEFAULT_POS, CUE_DEFAULT_POS[0], CUE_DEFAULT_POS[1] + CUE_LE
 EPS = 1e-1
 COLORS = {"GREEN" : (0, 100, 0), "BROWN": (101,67,33), "CUE": (100, 84, 82)}
 
+class Sides(Enum):
+    LEFT = 1
+    BOTTOM = 2
+    RIGHT = 3
+    TOP = 4
+    NONE = 0
+
 class Vector:
     def __init__(self, x: float, y: float):
         self.x = x
         self.y = y
 
-    def __add__(self, other):
+    def __add__(self, other: 'Vector'):
         return Vector(self.x + other.x, self.y + other.y)
     
-    def __sub__(self, other):
+    def __sub__(self, other: 'Vector'):
         return Vector(self.x - other.x, self.y - other.y)
     
-    def __mul__(self, scalar: float):
-        return Vector(self.x * scalar, self.y * scalar)
+    def __mul__(self, other):
+        if isinstance(other, Vector):
+            return self.x * other.x + self.y * other.y
+        elif isinstance(other, float) or isinstance(other, int):
+            return Vector(self.x * other, self.y * other)
+
+    def  __eq__(self, other: 'Vector'):
+        return self.x == other.x and self.y == other.y
     
     def module(self):
         return math.sqrt(self.x ** 2 + self.y ** 2)
@@ -48,6 +62,13 @@ class Vector:
     def get_normal(self):
         return Vector(-self.y, self.x)
     
+    def get_projection(self, base: 'Vector'):
+        bb = base * base       
+        if bb == 0:
+            return Vector(0, 0)
+        k = (self * base) / bb
+        return Vector(base.x * k, base.y * k)
+    
     def normalize(self):
         if (self.module() > 0):
             return self * (1 / self.module())
@@ -55,31 +76,36 @@ class Vector:
 
 
 class Ball:
-    def __init__(self, table, position: Vector):
+    def __init__(self, table: pg.Surface, position: Vector, index):
         self.table = table
         self.position = position
         self.velocity = Vector(0, 0)
         self.radius = BALL_SIZE
         self.color = "WHITE"
-
-    def update(self, dt: float):
+        self.index = index
+        
+    def update(self, dt: float, others: List['Ball']):
         self.position += self.velocity * dt
         if (pg.time.get_ticks() % 20 == 0):
             self.velocity *= 0.99
         if self.velocity.module() > EPS:
             colision_value = self.check_wall_collision()
-            if colision_value:
-                if colision_value == 1:
+            if colision_value.value:
+                if colision_value == Sides.LEFT:
                     self.velocity = Vector(-self.velocity.x, self.velocity.y)
-                elif colision_value == 2:
+                elif colision_value == Sides.BOTTOM:
                     self.velocity = Vector(self.velocity.x, -self.velocity.y)
-                elif colision_value == 3:
+                elif colision_value == Sides.RIGHT:
                     self.velocity = Vector(-self.velocity.x, self.velocity.y)
-                elif colision_value == 4:
+                elif colision_value == Sides.TOP:
                     self.velocity = Vector(self.velocity.x, -self.velocity.y)
+            for ball in others:
+                if ball.position != self.position:
+                    if self.check_balls_collision(ball):
+                        self.calculate_collision(ball)
+                        break
         else:
             self.velocity = Vector(0, 0)
-            
 
     def draw(self):
         pg.draw.circle(self.table, self.color, self.position.dot(), self.radius)
@@ -88,18 +114,30 @@ class Ball:
         if (dot.x - self.position.x) ** 2 + (dot.y - self.position.y) ** 2 < self.radius ** 2:
             return True
         return False
-    
+
     def check_wall_collision(self):
         if self.position.x - self.radius <= MARGIN_LEFT:
-            return 1 # Удар в левый бортик
+            return Sides.LEFT # Удар в левый бортик
         elif self.position.x + self.radius >= SCREEN_WIDTH - MARGIN_LEFT:
-            return 3 # Удар в правый бортик
+            return Sides.RIGHT # Удар в правый бортик
         elif self.position.y + self.radius >= SCREEN_HEIGHT - MARGIN_TOP:
-            return 2 # Удар в нижний бортик
+            return Sides.BOTTOM # Удар в нижний бортик
         elif self.position.y - self.radius <= MARGIN_TOP:
-            return 4 # Удар в верхний бортик
+            return Sides.TOP # Удар в верхний бортик
         else:
-            return 0
+            return Sides.NONE
+        
+    def calculate_collision(self, other: 'Ball'):
+        normal = self.position - other.position
+
+        self_normal_part = self.velocity.get_projection(normal)
+        self_tangent_part = self.velocity - self_normal_part 
+
+        other_normal_part = other.velocity.get_projection(normal)
+        other_tangent_part = other.velocity - other_normal_part
+
+        self.velocity = self_tangent_part + other_normal_part
+        other.velocity = other_tangent_part + self_normal_part
     
     def check_balls_collision(self, other: 'Ball'):
         return (self.position - other.position).module() < (self.radius + other.radius)
@@ -194,7 +232,7 @@ class Game:
 
     def update(self):
         for ball in self.balls:
-            ball.update(self.dt)
+            ball.update(self.dt, self.balls)
         self.cue.update()
 
     def handle_events(self):
@@ -230,7 +268,7 @@ class Game:
                             self.cue.aim_cue(current_ball)
                             self.mode = "aimed"
                     elif self.mode == "create":
-                        ball = Ball(self.screen, Vector(cursor_pos[0], cursor_pos[1]))
+                        ball = Ball(self.screen, Vector(cursor_pos[0], cursor_pos[1]), len(self.balls) + 1)
                         self.balls.append(ball)                
 
     def get_ball_by_coord(self, position: Vector):
