@@ -21,6 +21,8 @@ BORDER_MARGIN_TOP = MARGIN_TOP - BORDER / 2
 BORDER_MARGIN_LEFT = MARGIN_LEFT - BORDER / 2
 BORDER_BORDER_RADIUS = int(BORDER_RADIUS + BORDER / 2)
 BALL_SIZE = 15
+BALL_MASS = 1
+STIFFNESS_COEFFICIENT = 5.4 * 1e9
 CUE_DEFAULT_POS = (SCREEN_WIDTH - (SCREEN_WIDTH - BORDER_WIDTH) / 4 - CUE_WIDTH / 2, SCREEN_HEIGHT / 2 - CUE_LENGTH / 2)
 CUE_POLYGON = (*CUE_DEFAULT_POS, CUE_DEFAULT_POS[0], CUE_DEFAULT_POS[1] + CUE_LENGTH)
 EPS = 1e-1
@@ -62,18 +64,28 @@ class Vector:
     def get_normal(self):
         return Vector(-self.y, self.x)
     
+    def get_angle(self, other: 'Vector'):
+        rads = np.arccos((self * other) / self.module() / other.module())
+        if rads > math.pi / 2:
+            return rads - math.pi / 2
+        return rads
+    
     def get_projection(self, base: 'Vector'):
         bb = base * base       
         if bb == 0:
             return Vector(0, 0)
         k = (self * base) / bb
-        return Vector(base.x * k, base.y * k)
+        return base * k
     
     def normalize(self):
         if (self.module() > 0):
             return self * (1 / self.module())
         return Vector(0, 1)
 
+class Hole:
+    def __init__(self, table: pg.Surface, position: Vector):
+        self.table = table
+        self.position = position
 
 class Ball:
     def __init__(self, table: pg.Surface, position: Vector, index):
@@ -126,9 +138,18 @@ class Ball:
             return Sides.TOP # Удар в верхний бортик
         else:
             return Sides.NONE
-        
+    
+    def calculate_compression(self, normal: 'Vector'):
+        angle = self.velocity.get_angle(normal * -1)
+        relative_velocity = (self.velocity * (1 - float(np.sin(angle))) * (1/2)).module()
+        normal_part = self.velocity.get_projection(normal).module()
+        return np.sqrt(BALL_MASS * (normal_part ** 2 - 2 * relative_velocity ** 2) / 2 / STIFFNESS_COEFFICIENT)
+
+
     def calculate_collision(self, other: 'Ball'):
         normal = self.position - other.position
+
+        print(f"Current Δx is {self.calculate_compression(normal)}")
 
         self_normal_part = self.velocity.get_projection(normal)
         self_tangent_part = self.velocity - self_normal_part 
@@ -224,7 +245,7 @@ class Game:
     def draw(self):
         self.screen.fill("BLACK")
         self.border = pg.draw.rect(self.screen, COLORS["BROWN"], (BORDER_MARGIN_LEFT, BORDER_MARGIN_TOP, BORDER_WIDTH, BORDER_HEIGHT), border_radius=BORDER_BORDER_RADIUS)
-        self.table = pg.draw.rect(self.screen, COLORS["GREEN"], (MARGIN_LEFT, MARGIN_TOP, TABLE_WIDTH, TABLE_HEIGHT), border_radius=BORDER_RADIUS)
+        self.table = pg.draw.rect(self.screen, COLORS["GREEN"], (MARGIN_LEFT, MARGIN_TOP, TABLE_WIDTH, TABLE_HEIGHT))
         for ball in self.balls:
             ball.draw()
         self.cue.draw()
@@ -249,10 +270,8 @@ class Game:
                 elif self.mode == "velocity":
                     if event.key in range(48, 58):
                         self.hit_power += chr(int(event.key))
-                        print(f"Current force is {self.hit_power}")
                     elif event.key == 8:
                         self.hit_power = self.hit_power[:-1]
-                        print(f"Current force is {self.hit_power}")
                 elif self.mode == "aimed" and event.key == pg.K_SPACE:
                     if len(self.hit_power) > 0:
                         self.cue.apply_force(int(self.hit_power))
@@ -261,14 +280,16 @@ class Game:
                         self.hit_power = ""
             elif event.type == pg.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    cursor_pos = pg.mouse.get_pos()
+                    cursor_tuple = pg.mouse.get_pos()
+                    cursor_pos = Vector(cursor_tuple[0], cursor_tuple[1])
                     if self.mode == "game":
-                        current_ball: Ball = self.get_ball_by_coord(Vector(cursor_pos[0], cursor_pos[1]))
+                        current_ball: Ball = self.get_ball_by_coord(cursor_pos)
                         if current_ball != None:
                             self.cue.aim_cue(current_ball)
                             self.mode = "aimed"
                     elif self.mode == "create":
-                        ball = Ball(self.screen, Vector(cursor_pos[0], cursor_pos[1]), len(self.balls) + 1)
+                        if self.validate_pos(cursor_pos): return
+                        ball = Ball(self.screen, cursor_pos, len(self.balls) + 1)
                         self.balls.append(ball)                
 
     def get_ball_by_coord(self, position: Vector):
@@ -276,6 +297,13 @@ class Game:
             if ball.check_dot(position):
                 return ball
         return None
+    
+    def validate_pos(self, pos: Vector):
+        return (pos.x - BALL_SIZE <= MARGIN_LEFT or 
+                pos.x + BALL_SIZE >= SCREEN_WIDTH - MARGIN_LEFT or 
+                pos.y + BALL_SIZE >= SCREEN_HEIGHT - MARGIN_TOP or 
+                pos.y - BALL_SIZE <= MARGIN_TOP)
+
     
 if __name__ == "__main__":
     game = Game()
